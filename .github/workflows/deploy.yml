@@ -6,6 +6,7 @@ on:
     paths:
       - "encrypted/**"
       - "src/**"
+      - ".github/workflows/deploy.yml"
 
 permissions:
   contents: write
