@@ -8,7 +8,7 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 - `encrypted/payload.enc` — base64-encoded encrypted payload (committed)
 - `src/encrypt.mjs` — encrypts content → payload using Node.js crypto
 - `src/build.mjs` — embeds payload into wrapper → `dist/index.html`
-- `src/wrapper.html` — password form + Web Crypto decryption logic
+- `src/wrapper.html` — password form + Web Crypto decryption logic + session persistence + logout
 - `dist/` — build output (gitignored)
 - `.github/workflows/deploy.yml` — builds and deploys to gh-pages
 
@@ -17,6 +17,8 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 - AES-256-GCM, PBKDF2 (SHA-256, 600k iterations), 16-byte salt, 12-byte IV
 - Stored format: base64 of `salt(16) || iv(12) || ciphertext || authTag(16)`
 - Node.js `crypto` for encryption, Web Crypto API for browser decryption
+- Derived AES key bits (not the password) stored in `sessionStorage` (key `kijk-key`) for tab-scoped session persistence
+- Logout button clears storage and reloads
 
 ## Scripts
 

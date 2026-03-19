@@ -16,51 +16,70 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      background: #f5f5f5;
+      background: linear-gradient(135deg, #e8e0f0 0%, #dce4f2 50%, #e0ece8 100%);
     }
     .container {
       text-align: center;
+      background: rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 2.5rem 3rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    .lock {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+      opacity: 0.7;
     }
     h1 {
-      font-size: 1.4rem;
-      margin-bottom: 1rem;
-      color: #333;
+      font-size: 1.15rem;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+      color: #555;
+      letter-spacing: 0.02em;
     }
     form {
       display: flex;
       gap: 0.5rem;
     }
     input[type="password"] {
-      padding: 0.5rem 0.75rem;
-      font-size: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.95rem;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 8px;
       outline: none;
+      background: rgba(255, 255, 255, 0.7);
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
     input[type="password"]:focus {
-      border-color: #666;
+      border-color: rgba(0, 0, 0, 0.25);
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
     }
     button {
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      background: #333;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.95rem;
+      background: #444;
       color: #fff;
       border: none;
-      border-radius: 4px;
+      border-radius: 8px;
       cursor: pointer;
+      transition: background 0.2s;
     }
     button:hover {
-      background: #555;
+      background: #222;
     }
     .error {
-      color: #c00;
-      margin-top: 0.75rem;
-      font-size: 0.9rem;
+      color: #b33;
+      margin-top: 1rem;
+      font-size: 0.85rem;
     }
   </style>
 </head>
 <body>
   <div class="container">
+    <div class="lock">&#x1f512;</div>
     <h1>Password required</h1>
     <form id="form">
       <input type="password" id="password" autofocus placeholder="Enter password">
@@ -70,8 +89,105 @@
   </div>
 
   <script>
-    const PAYLOAD = "{{PAYLOAD}}";
+    const PAYLOAD           = "{{PAYLOAD}}";
     const PBKDF2_ITERATIONS = 600000;
+    const STORAGE_KEY       = "kijk-key";
+
+    function parsePayload() {
+      const raw        = Uint8Array.from(atob(PAYLOAD), (c) => c.charCodeAt(0));
+      const salt       = raw.slice(0, 16);
+      const iv         = raw.slice(16, 28);
+      const ciphertext = raw.slice(28);
+      return { salt, iv, ciphertext };
+    }
+
+    async function deriveKeyBits(password, salt) {
+      const keyData = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(password),
+        "PBKDF2",
+        false,
+        ["deriveBits"]
+      );
+      return await crypto.subtle.deriveBits(
+        { name: "PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+        keyData,
+        256
+      );
+    }
+
+    async function decryptWith(keyBits, iv, ciphertext) {
+      const aesKey = await crypto.subtle.importKey(
+        "raw",
+        keyBits,
+        { name: "AES-GCM" },
+        false,
+        ["decrypt"]
+      );
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        aesKey,
+        ciphertext
+      );
+      return new TextDecoder().decode(decrypted);
+    }
+
+    function renderContent(html) {
+      document.open();
+      document.write(html);
+      document.close();
+
+      const btn       = document.createElement("button");
+      btn.textContent = "Logout";
+      btn.style.cssText = [
+        "position:fixed",
+        "top:8px",
+        "left:8px",
+        "padding:4px 10px",
+        "font-size:0.8rem",
+        "background:rgba(0,0,0,0.35)",
+        "color:#fff",
+        "border:none",
+        "border-radius:4px",
+        "cursor:pointer",
+        "opacity:0.5",
+        "transition:opacity 0.2s",
+        "z-index:999999",
+      ].join(";");
+      btn.addEventListener("mouseenter", () => { btn.style.opacity = "1"; });
+      btn.addEventListener("mouseleave", () => { btn.style.opacity = "0.5"; });
+      btn.addEventListener("click", () => {
+        sessionStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      });
+      document.body.appendChild(btn);
+    }
+
+    async function decryptWithPassword(password) {
+      const { salt, iv, ciphertext } = parsePayload();
+      const keyBits                  = await deriveKeyBits(password, salt);
+      const html                     = await decryptWith(keyBits, iv, ciphertext);
+      sessionStorage.setItem(STORAGE_KEY, btoa(String.fromCharCode(...new Uint8Array(keyBits))));
+      renderContent(html);
+    }
+
+    async function restoreSession() {
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+      if (!stored) {
+        return;
+      }
+      try {
+        const keyBits                = Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
+        const { iv, ciphertext }     = parsePayload();
+        const html                   = await decryptWith(keyBits, iv, ciphertext);
+        renderContent(html);
+      } catch {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+    }
+
+    // Auto-decrypt from stored key on page load
+    restoreSession();
 
     document.getElementById("form").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -80,44 +196,7 @@
       errorEl.textContent = "";
 
       try {
-        const raw        = Uint8Array.from(atob(PAYLOAD), (c) => c.charCodeAt(0));
-        const salt       = raw.slice(0, 16);
-        const iv         = raw.slice(16, 28);
-        const ciphertext = raw.slice(28);
-
-        const enc     = new TextEncoder();
-        const keyData = await crypto.subtle.importKey(
-          "raw",
-          enc.encode(passwordEl.value),
-          "PBKDF2",
-          false,
-          ["deriveBits"]
-        );
-
-        const bits = await crypto.subtle.deriveBits(
-          { name: "PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
-          keyData,
-          256
-        );
-
-        const aesKey = await crypto.subtle.importKey(
-          "raw",
-          bits,
-          { name: "AES-GCM" },
-          false,
-          ["decrypt"]
-        );
-
-        const decrypted = await crypto.subtle.decrypt(
-          { name: "AES-GCM", iv: iv },
-          aesKey,
-          ciphertext
-        );
-
-        const html = new TextDecoder().decode(decrypted);
-        document.open();
-        document.write(html);
-        document.close();
+        await decryptWithPassword(passwordEl.value);
       } catch {
         errorEl.textContent = "Wrong password";
         passwordEl.value = "";
