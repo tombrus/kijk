@@ -16,63 +16,78 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      background: linear-gradient(135deg, #e8e0f0 0%, #dce4f2 50%, #e0ece8 100%);
+      background: linear-gradient(150deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%);
     }
     .container {
       text-align: center;
-      background: rgba(255, 255, 255, 0.65);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      padding: 2.5rem 3rem;
-      border-radius: 16px;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.07);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 3.5rem 4rem;
+      border-radius: 20px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-width: 380px;
     }
     .lock {
-      font-size: 2rem;
-      margin-bottom: 0.75rem;
-      opacity: 0.7;
+      font-size: 2.8rem;
+      margin-bottom: 1rem;
+      opacity: 0.85;
     }
     h1 {
-      font-size: 1.15rem;
+      font-size: 1.3rem;
       font-weight: 500;
-      margin-bottom: 1.5rem;
-      color: #555;
+      margin-bottom: 0.5rem;
+      color: #fff;
       letter-spacing: 0.02em;
+    }
+    .subtitle {
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.45);
+      margin-bottom: 2rem;
     }
     form {
       display: flex;
-      gap: 0.5rem;
+      flex-direction: column;
+      gap: 0.75rem;
     }
     input[type="password"] {
-      padding: 0.6rem 0.9rem;
-      font-size: 0.95rem;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
       outline: none;
-      background: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
+    input[type="password"]::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
     input[type="password"]:focus {
-      border-color: rgba(0, 0, 0, 0.25);
-      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+      border-color: #e94560;
+      box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
     }
     button {
-      padding: 0.6rem 1.2rem;
-      font-size: 0.95rem;
-      background: #444;
+      padding: 0.75rem 1.2rem;
+      font-size: 1rem;
+      font-weight: 500;
+      background: linear-gradient(135deg, #e94560 0%, #c2185b 100%);
       color: #fff;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: opacity 0.2s, transform 0.1s;
     }
     button:hover {
-      background: #222;
+      opacity: 0.9;
+    }
+    button:active {
+      transform: scale(0.98);
     }
     .error {
-      color: #b33;
-      margin-top: 1rem;
+      color: #ff6b81;
+      margin-top: 0.75rem;
       font-size: 0.85rem;
     }
   </style>
@@ -81,6 +96,7 @@
   <div class="container">
     <div class="lock">&#x1f512;</div>
     <h1>Password required</h1>
+    <p class="subtitle">This content is encrypted</p>
     <form id="form">
       <input type="password" id="password" autofocus placeholder="Enter password">
       <button type="submit">Unlock</button>
