@@ -1,0 +1,8 @@
+{
+  "name": "kijk",
+  "type": "module",
+  "scripts": {
+    "encrypt": "node src/encrypt.mjs",
+    "build": "node src/build.mjs"
+  }
+}

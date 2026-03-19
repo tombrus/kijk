@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kijk</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #f5f5f5;
+    }
+    .container {
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 1rem;
+      color: #333;
+    }
+    form {
+      display: flex;
+      gap: 0.5rem;
+    }
+    input[type="password"] {
+      padding: 0.5rem 0.75rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      outline: none;
+    }
+    input[type="password"]:focus {
+      border-color: #666;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #555;
+    }
+    .error {
+      color: #c00;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Password required</h1>
+    <form id="form">
+      <input type="password" id="password" autofocus placeholder="Enter password">
+      <button type="submit">Unlock</button>
+    </form>
+    <div id="error" class="error"></div>
+  </div>
+
+  <script>
+    const PAYLOAD = "{{PAYLOAD}}";
+    const PBKDF2_ITERATIONS = 600000;
+
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl    = document.getElementById("error");
+      const passwordEl = document.getElementById("password");
+      errorEl.textContent = "";
+
+      try {
+        const raw        = Uint8Array.from(atob(PAYLOAD), (c) => c.charCodeAt(0));
+        const salt       = raw.slice(0, 16);
+        const iv         = raw.slice(16, 28);
+        const ciphertext = raw.slice(28);
+
+        const enc     = new TextEncoder();
+        const keyData = await crypto.subtle.importKey(
+          "raw",
+          enc.encode(passwordEl.value),
+          "PBKDF2",
+          false,
+          ["deriveBits"]
+        );
+
+        const bits = await crypto.subtle.deriveBits(
+          { name: "PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+          keyData,
+          256
+        );
+
+        const aesKey = await crypto.subtle.importKey(
+          "raw",
+          bits,
+          { name: "AES-GCM" },
+          false,
+          ["decrypt"]
+        );
+
+        const decrypted = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: iv },
+          aesKey,
+          ciphertext
+        );
+
+        const html = new TextDecoder().decode(decrypted);
+        document.open();
+        document.write(html);
+        document.close();
+      } catch {
+        errorEl.textContent = "Wrong password";
+        passwordEl.value = "";
+        passwordEl.focus();
+      }
+    });
+  </script>
+</body>
+</html>
