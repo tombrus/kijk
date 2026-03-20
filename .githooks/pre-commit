@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Guard: ensure encrypted files are up-to-date with secrets.
+# Blocks commit if any secret source is newer than its encrypted output.
+
+check_stale() {
+  local src="$1"
+  local dst="$2"
+
+  if [ ! -f "$src" ]; then
+    return
+  fi
+
+  if [ ! -f "$dst" ]; then
+    echo "Error: $dst does not exist. Run ./prepare.sh first."
+    exit 1
+  fi
+
+  if [ "$src" -nt "$dst" ]; then
+    echo "Error: $src is newer than $dst. Run ./prepare.sh first."
+    exit 1
+  fi
+}
+
+check_stale secrets/page.html   encrypted/payload.enc
+check_stale secrets/master-key  encrypted/payload.enc
+check_stale secrets/pat         encrypted/monitor.enc
+check_stale secrets/pat-key     encrypted/monitor.enc

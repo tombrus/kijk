@@ -28,7 +28,7 @@ function deriveKey(password, salt) {
   });
 }
 
-const inputPath  = "content/page.html";
+const inputPath  = "secrets/page.html";
 const outputPath = "encrypted/payload.enc";
 
 const plaintext = await readFile(inputPath);

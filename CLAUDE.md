@@ -4,11 +4,19 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 
 ## Project Structure
 
-- `content/page.html` — secret HTML (gitignored)
+- `secrets/page.html` — secret HTML (gitignored)
+- `secrets/master-key` — content encryption password (gitignored)
+- `secrets/pat` — GitHub PAT for monitoring (gitignored)
+- `secrets/pat-key` — random AES-256 obfuscation key, auto-generated (gitignored)
+- `secrets/monitor-issue` — cached issue number, auto-created (gitignored)
 - `encrypted/payload.enc` — base64-encoded encrypted payload (committed)
+- `encrypted/monitor.enc` — encrypted monitor config (committed)
+- `encrypted/monitor.key` — pat-key copy for build + monitor (committed)
 - `src/encrypt.mjs` — encrypts content → payload using Node.js crypto
-- `src/build.mjs` — embeds payload into wrapper → `dist/index.html`
+- `src/build.mjs` — embeds payload + monitor data into wrapper → `dist/index.html`
 - `src/wrapper.html` — password form + Web Crypto decryption logic + session persistence + logout
+- `src/monitor.mjs` — CLI script to fetch and decrypt access log entries
+- `prepare.sh` — local script that encrypts everything and prepares committed artifacts
 - `dist/` — build output (gitignored)
 - `.github/workflows/deploy.yml` — builds and deploys to gh-pages
 
@@ -20,15 +28,62 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 - Derived AES key bits (not the password) stored in `sessionStorage` (key `kijk-key`) for tab-scoped session persistence
 - Logout button clears storage and reloads
 
+## Monitoring (Access Log via GitHub Issues)
+
+Optional feature: logs access events (unlock, session restore, failed attempts) as comments on a dedicated GitHub Issue.
+
+### How It Works
+
+- `prepare.sh` encrypts the API URL + PAT with a random AES-256-GCM key (pat-key)
+- The encrypted config is stored in `encrypted/monitor.enc`, the key in `encrypted/monitor.key`
+- `build.mjs` reads these files and injects them into the wrapper as `{{MONITOR_KEY}}` and `{{MONITOR_DATA}}`
+- No GitHub secrets needed — the deploy workflow just runs `npm run build`
+- Two encryption tiers for log entries:
+  - **Secure**: encrypted with the content-derived AES key (only password holders can read)
+  - **Obfuscated**: encrypted with the pat-key (prevents casual reading on public issue)
+- Successful access → `[secure:...]`, failed attempts → `[obfuscated:...]`
+
+### User Setup (one-time)
+
+1. Create a fine-grained PAT (github.com → Settings → Developer settings)
+   - Scope: this repo only, permission: Issues (Read & Write)
+2. Place secrets locally:
+   ```
+   echo "mypassword" > secrets/master-key
+   echo "ghp_xxx" > secrets/pat
+   ```
+3. Run `./prepare.sh` (auto-generates pat-key, finds/creates issue, encrypts everything)
+4. Commit `encrypted/` and push
+
+### Reading the Log
+
+```
+npm run monitor
+```
+
+(Reads config from `encrypted/monitor.enc` + `encrypted/monitor.key`, prompts for content password)
+
+### Files
+
+- `src/monitor.mjs` — CLI script to fetch and decrypt all log entries
+- `encrypted/monitor.key` — random AES key for obfuscated entries (committed)
+- `encrypted/monitor.enc` — encrypted API URL + PAT (committed)
+
 ## Scripts
 
-- `npm run encrypt` — encrypt `content/page.html` (prompts for password)
+- `npm run encrypt` — encrypt `secrets/page.html` (prompts for password)
 - `npm run build` — build `dist/index.html` from wrapper + payload
+- `npm run monitor` — read and decrypt the access log (prompts for content password)
+- `npm run prepare-secrets` — run `prepare.sh` to encrypt all secrets
 
 ## Workflow
 
-1. Place HTML in `content/page.html`
-2. `npm run encrypt` → enter password
+1. One-time setup:
+   ```
+   echo "mypassword" > secrets/master-key
+   echo "ghp_xxx" > secrets/pat
+   ```
+2. Run `./prepare.sh` (encrypts page, sets up monitoring)
 3. `npm run build` → preview locally
-4. Commit `encrypted/payload.enc`, push to `main`
-5. GitHub Action deploys to gh-pages
+4. `git add encrypted/ && git commit && git push`
+5. GitHub Action runs `npm run build` → deploys to gh-pages

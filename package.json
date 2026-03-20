@@ -3,6 +3,8 @@
   "type": "module",
   "scripts": {
     "encrypt": "node src/encrypt.mjs",
-    "build": "node src/build.mjs"
+    "build": "node src/build.mjs",
+    "monitor": "node src/monitor.mjs",
+    "prepare-secrets": "bash prepare.sh"
   }
 }

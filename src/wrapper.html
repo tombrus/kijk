@@ -109,6 +109,8 @@
     const PAYLOAD           = "{{PAYLOAD}}";
     const PBKDF2_ITERATIONS = 600000;
     const STORAGE_KEY       = "kijk-key";
+    const MONITOR_KEY       = "{{MONITOR_KEY}}";
+    const MONITOR_DATA      = "{{MONITOR_DATA}}";
 
     function parsePayload() {
       const raw        = Uint8Array.from(atob(PAYLOAD), (c) => c.charCodeAt(0));
@@ -149,6 +151,85 @@
       return new TextDecoder().decode(decrypted);
     }
 
+    async function decryptMonitor() {
+      const keyBytes  = Uint8Array.from(atob(MONITOR_KEY), (c) => c.charCodeAt(0));
+      const dataBytes = Uint8Array.from(atob(MONITOR_DATA), (c) => c.charCodeAt(0));
+      const iv         = dataBytes.slice(0, 12);
+      const ciphertext = dataBytes.slice(12);
+      const aesKey = await crypto.subtle.importKey(
+        "raw",
+        keyBytes,
+        { name: "AES-GCM" },
+        false,
+        ["decrypt"]
+      );
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        aesKey,
+        ciphertext
+      );
+      return JSON.parse(new TextDecoder().decode(decrypted));
+    }
+
+    async function encryptLogEntry(text, keyBits) {
+      const iv     = crypto.getRandomValues(new Uint8Array(12));
+      const aesKey = await crypto.subtle.importKey(
+        "raw",
+        keyBits,
+        { name: "AES-GCM" },
+        false,
+        ["encrypt"]
+      );
+      const encrypted = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: iv },
+        aesKey,
+        new TextEncoder().encode(text)
+      );
+      const combined = new Uint8Array(12 + encrypted.byteLength);
+      combined.set(iv, 0);
+      combined.set(new Uint8Array(encrypted), 12);
+      return btoa(String.fromCharCode(...combined));
+    }
+
+    async function logAccess(event, keyBits) {
+      if (!MONITOR_KEY) {
+        return;
+      }
+      try {
+        const config = await decryptMonitor();
+        let ip = "unknown";
+        try {
+          const ctrl = new AbortController();
+          const tid  = setTimeout(() => ctrl.abort(), 3000);
+          const resp = await fetch("https://api.ipify.org?format=text", { signal: ctrl.signal });
+          clearTimeout(tid);
+          ip = (await resp.text()).trim();
+        } catch {
+          // timeout or network error — keep "unknown"
+        }
+        const line = `${event} | ${new Date().toISOString()} | IP: ${ip} | UA: ${navigator.userAgent}`;
+        let body;
+        if (keyBits) {
+          const encrypted = await encryptLogEntry(line, keyBits);
+          body = `[secure:${encrypted}]`;
+        } else {
+          const monKeyBytes = Uint8Array.from(atob(MONITOR_KEY), (c) => c.charCodeAt(0));
+          const encrypted   = await encryptLogEntry(line, monKeyBytes);
+          body = `[obfuscated:${encrypted}]`;
+        }
+        fetch(config.url, {
+          method: "POST",
+          headers: {
+            "Authorization": `token ${config.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ body: body }),
+        }).catch(() => {});
+      } catch {
+        // monitoring must never break the page
+      }
+    }
+
     function renderContent(html) {
       document.open();
       document.write(html);
@@ -185,6 +266,7 @@
       const keyBits                  = await deriveKeyBits(password, salt);
       const html                     = await decryptWith(keyBits, iv, ciphertext);
       sessionStorage.setItem(STORAGE_KEY, btoa(String.fromCharCode(...new Uint8Array(keyBits))));
+      logAccess("Unlock", new Uint8Array(keyBits));
       renderContent(html);
     }
 
@@ -194,9 +276,10 @@
         return;
       }
       try {
-        const keyBits                = Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
-        const { iv, ciphertext }     = parsePayload();
-        const html                   = await decryptWith(keyBits, iv, ciphertext);
+        const keyBits            = Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
+        const { iv, ciphertext } = parsePayload();
+        const html               = await decryptWith(keyBits, iv, ciphertext);
+        logAccess("Session restore", keyBits);
         renderContent(html);
       } catch {
         sessionStorage.removeItem(STORAGE_KEY);
@@ -215,6 +298,7 @@
       try {
         await decryptWithPassword(passwordEl.value);
       } catch {
+        logAccess("Failed attempt", null);
         errorEl.textContent = "Wrong password";
         passwordEl.value = "";
         passwordEl.focus();
