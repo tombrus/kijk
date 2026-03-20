@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# --- Sync secrets from source repo ---
+if [ -f secrets/sync.sh ]; then
+  bash secrets/sync.sh
+fi
+
 INFO_FILE="secrets/info.json"
 
 # --- Validate required files ---

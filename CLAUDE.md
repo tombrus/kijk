@@ -5,6 +5,7 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 ## Project Structure
 
 - `secrets/page.html` — secret HTML (gitignored)
+- `secrets/sync.sh` — copies info.json and page.html from source repo (gitignored)
 - `secrets/info.json` — master-key, pat, pat-key, monitor-issue, title (gitignored)
 - `encrypted/payload.enc` — base64-encoded encrypted payload (committed)
 - `encrypted/monitor.enc` — encrypted monitor config (committed)
