@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kijk</title>
+  <title>{{TITLE}}</title>
   <style>
     * {
       margin: 0;
@@ -34,12 +34,18 @@
       margin-bottom: 1rem;
       opacity: 0.85;
     }
-    h1 {
-      font-size: 1.3rem;
-      font-weight: 500;
-      margin-bottom: 0.5rem;
+    .title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
       color: #fff;
       letter-spacing: 0.02em;
+    }
+    .prompt {
+      font-size: 1rem;
+      font-weight: 400;
+      margin-bottom: 0.5rem;
+      color: rgba(255, 255, 255, 0.7);
     }
     .subtitle {
       font-size: 0.85rem;
@@ -96,7 +102,8 @@
 <body>
   <div class="container">
     <div class="lock">&#x1f512;</div>
-    <h1>Password required</h1>
+    <h1 class="title">{{TITLE}}</h1>
+    <p class="prompt">Password required</p>
     <p class="subtitle">This content is encrypted</p>
     <form id="form">
       <input type="text" id="password" autofocus autocomplete="off" placeholder="Enter password">

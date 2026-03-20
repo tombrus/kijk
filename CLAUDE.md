@@ -5,13 +5,11 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 ## Project Structure
 
 - `secrets/page.html` — secret HTML (gitignored)
-- `secrets/master-key` — content encryption password (gitignored)
-- `secrets/pat` — GitHub PAT for monitoring (gitignored)
-- `secrets/pat-key` — random AES-256 obfuscation key, auto-generated (gitignored)
-- `secrets/monitor-issue` — cached issue number, auto-created (gitignored)
+- `secrets/info.json` — master-key, pat, pat-key, monitor-issue, title (gitignored)
 - `encrypted/payload.enc` — base64-encoded encrypted payload (committed)
 - `encrypted/monitor.enc` — encrypted monitor config (committed)
 - `encrypted/monitor.key` — pat-key copy for build + monitor (committed)
+- `encrypted/title.txt` — page title for the password dialog (committed)
 - `src/encrypt.mjs` — encrypts content → payload using Node.js crypto
 - `src/build.mjs` — embeds payload + monitor data into wrapper → `dist/index.html`
 - `src/wrapper.html` — password form + Web Crypto decryption logic + session persistence + logout
@@ -19,6 +17,7 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 - `prepare.sh` — local script that encrypts everything and prepares committed artifacts
 - `dist/` — build output (gitignored)
 - `.github/workflows/deploy.yml` — builds and deploys to gh-pages
+- `README.md` — public-facing documentation for external users
 
 ## Encryption
 
@@ -47,12 +46,15 @@ Optional feature: logs access events (unlock, session restore, failed attempts) 
 
 1. Create a fine-grained PAT (github.com → Settings → Developer settings)
    - Scope: this repo only, permission: Issues (Read & Write)
-2. Place secrets locally:
+2. Create `secrets/info.json`:
+   ```json
+   {
+     "master-key": "mypassword",
+     "pat": "ghp_xxx",
+     "title": "My Page"
+   }
    ```
-   echo "mypassword" > secrets/master-key
-   echo "ghp_xxx" > secrets/pat
-   ```
-3. Run `./prepare.sh` (auto-generates pat-key, finds/creates issue, encrypts everything)
+3. Run `./prepare.sh` (auto-generates pat-key, finds/creates issue, saves them back to info.json, encrypts everything)
 4. Commit `encrypted/` and push
 
 ### Reading the Log
@@ -61,7 +63,7 @@ Optional feature: logs access events (unlock, session restore, failed attempts) 
 npm run monitor
 ```
 
-(Reads config from `encrypted/monitor.enc` + `encrypted/monitor.key`, prompts for content password)
+(Reads config from `encrypted/monitor.enc` + `encrypted/monitor.key`, reads password from `secrets/info.json` or prompts if missing. Outputs aligned columns: tier, event, date, IP, user agent. Also writes a markdown report to `secrets/monitor.md`.)
 
 ### Files
 
@@ -71,18 +73,13 @@ npm run monitor
 
 ## Scripts
 
-- `npm run encrypt` — encrypt `secrets/page.html` (prompts for password)
 - `npm run build` — build `dist/index.html` from wrapper + payload
 - `npm run monitor` — read and decrypt the access log (prompts for content password)
 - `npm run prepare-secrets` — run `prepare.sh` to encrypt all secrets
 
 ## Workflow
 
-1. One-time setup:
-   ```
-   echo "mypassword" > secrets/master-key
-   echo "ghp_xxx" > secrets/pat
-   ```
+1. One-time setup — create `secrets/info.json` with `master-key` and `pat`
 2. Run `./prepare.sh` (encrypts page, sets up monitoring)
 3. `npm run build` → preview locally
 4. `git add encrypted/ && git commit && git push`

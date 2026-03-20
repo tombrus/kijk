@@ -1,20 +1,9 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { createInterface }    from "node:readline";
 import { randomBytes, pbkdf2, createCipheriv } from "node:crypto";
 
 const PBKDF2_ITERATIONS = 600_000;
 const SALT_LENGTH       = 16;
 const IV_LENGTH         = 12;
-
-function askPassword() {
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
-  return new Promise((resolve) => {
-    rl.question("Password: ", (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
 
 function deriveKey(password, salt) {
   return new Promise((resolve, reject) => {
@@ -28,11 +17,19 @@ function deriveKey(password, salt) {
   });
 }
 
+const infoPath   = "secrets/info.json";
 const inputPath  = "secrets/page.html";
 const outputPath = "encrypted/payload.enc";
 
+const info      = JSON.parse(await readFile(infoPath, "utf8"));
+const password  = info["master-key"];
+
+if (!password) {
+  console.error(`Error: ${infoPath} must contain 'master-key'`);
+  process.exit(1);
+}
+
 const plaintext = await readFile(inputPath);
-const password  = await askPassword();
 
 const salt = randomBytes(SALT_LENGTH);
 const iv   = randomBytes(IV_LENGTH);

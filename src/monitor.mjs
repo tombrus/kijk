@@ -1,4 +1,4 @@
-import { readFile }                        from "node:fs/promises";
+import { readFile, writeFile }             from "node:fs/promises";
 import { createInterface }                 from "node:readline";
 import { pbkdf2, createDecipheriv }        from "node:crypto";
 
@@ -72,7 +72,13 @@ function decryptEntry(b64Data, keyBuffer) {
   return decrypted.toString("utf8");
 }
 
-const password   = await askPassword();
+let password = "";
+try {
+  const info = JSON.parse(await readFile("secrets/info.json", "utf8"));
+  password   = info["master-key"];
+} catch {
+  password = await askPassword();
+}
 const contentKey = await deriveKey(password, salt);
 
 const monitorKey = monitorKeyB64 ? Buffer.from(monitorKeyB64, "base64") : null;
@@ -103,37 +109,132 @@ while (true) {
   page++;
 }
 
-console.log(`\n--- Access Log (${comments.length} entries) ---\n`);
-
 const secureRe     = /^\[secure:(.+)]$/;
 const obfuscatedRe = /^\[obfuscated:(.+)]$/;
+const entryRe      = /^(.+?)\s*\|\s*(.+?)\s*\|\s*IP:\s*(.+?)\s*\|\s*UA:\s*(.+)$/;
+
+function parseEntry(plaintext) {
+  const m = plaintext.match(entryRe);
+  if (m) {
+    return { event: m[1], date: m[2], ip: m[3], ua: m[4] };
+  }
+  return null;
+}
+
+function formatDate(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) {
+    return iso;
+  }
+  const pad  = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+const rows = [];
 
 for (const comment of comments) {
   const body            = comment.body.trim();
   const secureMatch     = body.match(secureRe);
   const obfuscatedMatch = body.match(obfuscatedRe);
+  let tier              = "";
+  let plaintext         = "";
 
   if (secureMatch) {
+    tier = "SECURE";
     try {
-      const plaintext = decryptEntry(secureMatch[1], contentKey);
-      console.log(`[SECURE]     ${plaintext}`);
+      plaintext = decryptEntry(secureMatch[1], contentKey);
     } catch {
-      console.log(`[SECURE]     <decryption failed — wrong password?>`);
+      plaintext = null;
     }
   } else if (obfuscatedMatch) {
+    tier = "OBFUSC";
     if (monitorKey) {
       try {
-        const plaintext = decryptEntry(obfuscatedMatch[1], monitorKey);
-        console.log(`[OBFUSCATED] ${plaintext}`);
+        plaintext = decryptEntry(obfuscatedMatch[1], monitorKey);
       } catch {
-        console.log(`[OBFUSCATED] <decryption failed>`);
+        plaintext = null;
       }
     } else {
-      console.log(`[OBFUSCATED] <no monitor key available>`);
+      plaintext = null;
     }
   } else {
-    console.log(`[PLAIN]      ${body}`);
+    tier      = "PLAIN";
+    plaintext = body;
+  }
+
+  if (plaintext === null) {
+    rows.push({ tier, event: "<decryption failed>", date: "", ip: "", ua: "" });
+  } else {
+    const parsed = parseEntry(plaintext);
+    if (parsed) {
+      rows.push({ tier, event: parsed.event, date: formatDate(parsed.date), ip: parsed.ip, ua: parsed.ua });
+    } else {
+      rows.push({ tier, event: plaintext, date: "", ip: "", ua: "" });
+    }
   }
 }
 
+const colW = {
+  tier:  Math.max(4,  ...rows.map((r) => r.tier.length)),
+  event: Math.max(5,  ...rows.map((r) => r.event.length)),
+  date:  Math.max(4,  ...rows.map((r) => r.date.length)),
+  ip:    Math.max(2,  ...rows.map((r) => r.ip.length)),
+};
+
+const header = [
+  "TIER".padEnd(colW.tier),
+  "EVENT".padEnd(colW.event),
+  "DATE".padEnd(colW.date),
+  "IP".padEnd(colW.ip),
+  "UA",
+].join("  ");
+
+const separator = [
+  "─".repeat(colW.tier),
+  "─".repeat(colW.event),
+  "─".repeat(colW.date),
+  "─".repeat(colW.ip),
+  "──",
+].join("──");
+
+console.log(`\n--- Access Log (${rows.length} entries) ---\n`);
+console.log(header);
+console.log(separator);
+
+for (const row of rows) {
+  const line = [
+    row.tier.padEnd(colW.tier),
+    row.event.padEnd(colW.event),
+    row.date.padEnd(colW.date),
+    row.ip.padEnd(colW.ip),
+    row.ua,
+  ].join("  ");
+  console.log(line);
+}
+
 console.log(`\n--- End ---`);
+
+// Write markdown report to secrets/monitor.md
+const mdLines = [];
+mdLines.push(`# Access Log`);
+mdLines.push(``);
+mdLines.push(`Generated: ${new Date().toISOString()}`);
+mdLines.push(``);
+mdLines.push(`| Tier | Event | Date | IP | UA |`);
+mdLines.push(`| --- | --- | --- | --- | --- |`);
+
+for (const row of rows) {
+  const tier  = row.tier  || "";
+  const event = row.event || "";
+  const date  = row.date  || "";
+  const ip    = row.ip    || "";
+  const ua    = row.ua    || "";
+  mdLines.push(`| ${tier} | ${event} | ${date} | ${ip} | ${ua} |`);
+}
+
+mdLines.push(``);
+mdLines.push(`${rows.length} entries total.`);
+mdLines.push(``);
+
+await writeFile("secrets/monitor.md", mdLines.join("\n"), "utf8");
+console.log(`\nWritten to secrets/monitor.md`);

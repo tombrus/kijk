@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+INFO_FILE="secrets/info.json"
+
 # --- Validate required files ---
 missing=()
-[ ! -f secrets/master-key ] && missing+=("secrets/master-key")
+[ ! -f "$INFO_FILE" ]      && missing+=("$INFO_FILE")
 [ ! -f secrets/page.html ]  && missing+=("secrets/page.html")
-[ ! -f secrets/pat ]        && missing+=("secrets/pat")
 
 if [ ${#missing[@]} -gt 0 ]; then
   echo "Error: missing required files:"
@@ -15,20 +16,42 @@ if [ ${#missing[@]} -gt 0 ]; then
   exit 1
 fi
 
-PASSWORD=$(cat secrets/master-key)
-PAT=$(cat secrets/pat)
+# --- Read values from info.json ---
+PASSWORD=$(node -e "process.stdout.write(require('./$INFO_FILE')['master-key'])")
+PAT=$(node -e "process.stdout.write(require('./$INFO_FILE')['pat'])")
+
+# --- Validate required keys ---
+if [ -z "$PASSWORD" ] || [ -z "$PAT" ]; then
+  echo "Error: $INFO_FILE must contain 'master-key' and 'pat'"
+  exit 1
+fi
 
 # --- Auto-generate pat-key if missing ---
-if [ ! -f secrets/pat-key ]; then
-  openssl rand -base64 32 > secrets/pat-key
-  echo "Generated secrets/pat-key"
+PAT_KEY=$(node -e "const v=require('./$INFO_FILE')['pat-key']; if(v) process.stdout.write(v)")
+if [ -z "$PAT_KEY" ]; then
+  PAT_KEY=$(openssl rand -base64 32)
+  node -e "
+    const fs   = require('fs');
+    const info = JSON.parse(fs.readFileSync('$INFO_FILE', 'utf8'));
+    info['pat-key'] = '$PAT_KEY';
+    fs.writeFileSync('$INFO_FILE', JSON.stringify(info, null, 2) + '\n');
+  "
+  echo "Generated pat-key in $INFO_FILE"
 fi
-PAT_KEY=$(cat secrets/pat-key)
+
+# --- Read optional title ---
+TITLE=$(node -e "const v=require('./$INFO_FILE')['title']; if(v) process.stdout.write(v)")
 
 # --- Encrypt page.html → encrypted/payload.enc ---
 mkdir -p encrypted
-echo "$PASSWORD" | node src/encrypt.mjs
+node src/encrypt.mjs
 echo "Wrote encrypted/payload.enc"
+
+# --- Write title ---
+if [ -n "$TITLE" ]; then
+  echo -n "$TITLE" > encrypted/title.txt
+  echo "Wrote encrypted/title.txt"
+fi
 
 # --- Determine repo from git remote ---
 REMOTE_URL=$(git remote get-url origin)
@@ -37,11 +60,9 @@ REPO=$(echo "$REMOTE_URL" | sed -E 's#(https://github\.com/|git@github\.com:)##;
 echo "Repo: $REPO"
 
 # --- Find or create Access Log issue ---
-ISSUE=""
-if [ -f secrets/monitor-issue ] && [ -s secrets/monitor-issue ]; then
-  ISSUE=$(cat secrets/monitor-issue)
-  echo "Using cached issue #$ISSUE"
-else
+ISSUE=$(node -e "const v=require('./$INFO_FILE')['monitor-issue']; if(v) process.stdout.write(String(v))")
+
+if [ -z "$ISSUE" ]; then
   # Search for existing "Access Log" issue
   ISSUE=$(curl -s -H "Authorization: token $PAT" \
     -H "Accept: application/vnd.github+json" \
@@ -76,7 +97,15 @@ else
     echo "Found existing issue #$ISSUE"
   fi
 
-  echo "$ISSUE" > secrets/monitor-issue
+  # Save issue number back to info.json
+  node -e "
+    const fs   = require('fs');
+    const info = JSON.parse(fs.readFileSync('$INFO_FILE', 'utf8'));
+    info['monitor-issue'] = $ISSUE;
+    fs.writeFileSync('$INFO_FILE', JSON.stringify(info, null, 2) + '\n');
+  "
+else
+  echo "Using cached issue #$ISSUE"
 fi
 
 # --- Build API URL and encrypt monitor config ---
@@ -96,8 +125,8 @@ node -e "
 
 echo "Wrote encrypted/monitor.enc"
 
-# --- Copy pat-key → encrypted/monitor.key ---
-cp secrets/pat-key encrypted/monitor.key
+# --- Write pat-key → encrypted/monitor.key ---
+echo -n "$PAT_KEY" > encrypted/monitor.key
 echo "Wrote encrypted/monitor.key"
 
 # --- Summary ---
