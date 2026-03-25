@@ -23,6 +23,7 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 ## Encryption
 
 - AES-256-GCM, PBKDF2 (SHA-256, 600k iterations), 16-byte salt, 12-byte IV
+- Salt is reused from existing payload on re-encryption to keep the content-derived key stable (preserves monitor secure entry decryptability)
 - Stored format: base64 of `salt(16) || iv(12) || ciphertext || authTag(16)`
 - Node.js `crypto` for encryption, Web Crypto API for browser decryption
 - Derived AES key bits (not the password) stored in `sessionStorage` (key `kijk-key`) for tab-scoped session persistence

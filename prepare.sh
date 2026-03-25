@@ -134,6 +134,9 @@ echo "Wrote encrypted/monitor.enc"
 echo -n "$PAT_KEY" > encrypted/monitor.key
 echo "Wrote encrypted/monitor.key"
 
+# --- Fetch monitor log ---
+npm run monitor
+
 # --- Summary ---
 echo ""
 echo "=== prepare.sh complete ==="

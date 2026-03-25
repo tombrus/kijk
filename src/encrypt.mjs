@@ -31,8 +31,19 @@ if (!password) {
 
 const plaintext = await readFile(inputPath);
 
-const salt = randomBytes(SALT_LENGTH);
-const iv   = randomBytes(IV_LENGTH);
+// Reuse existing salt so the content-derived key stays stable across
+// re-encryptions (keeps monitor secure entries decryptable).
+let salt;
+try {
+  const existing    = await readFile(outputPath, "utf8");
+  const existingBuf = Buffer.from(existing.trim(), "base64");
+  salt              = existingBuf.subarray(0, SALT_LENGTH);
+  console.log("Reusing salt from existing payload");
+} catch {
+  salt = randomBytes(SALT_LENGTH);
+  console.log("Generated new salt");
+}
+const iv = randomBytes(IV_LENGTH);
 const key  = await deriveKey(password, salt);
 
 const cipher     = createCipheriv("aes-256-gcm", key, iv);
