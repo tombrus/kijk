@@ -12,8 +12,8 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 - `encrypted/monitor.key` — pat-key copy for build + monitor (committed)
 - `encrypted/title.txt` — page title for the password dialog (committed)
 - `src/encrypt.mjs` — encrypts content → payload using Node.js crypto
-- `src/build.mjs` — embeds payload + monitor data into wrapper → `dist/index.html`
-- `src/wrapper.html` — password form + Web Crypto decryption logic + session persistence + logout
+- `src/build.mjs` — embeds payload + monitor data into wrapper → `dist/index.html` + `dist/version.txt`
+- `src/wrapper.html` — password form + Web Crypto decryption logic + session persistence + logout + cache-busting
 - `src/monitor.mjs` — CLI script to fetch and decrypt access log entries
 - `prepare.sh` — local script that encrypts everything and prepares committed artifacts
 - `dist/` — build output (gitignored)
@@ -28,6 +28,14 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 - Node.js `crypto` for encryption, Web Crypto API for browser decryption
 - Derived AES key bits (not the password) stored in `sessionStorage` (key `kijk-key`) for tab-scoped session persistence
 - Logout button clears storage and reloads
+
+## Cache Busting
+
+- `build.mjs` computes a SHA-256 hash (first 8 hex chars) of the HTML before injecting the hash
+- Hash is embedded in the wrapper as `BUILD_HASH` constant and written to `dist/version.txt`
+- On page load, the wrapper fetches `version.txt?_=<timestamp>` (always fresh due to cache-busting query param)
+- If the server hash differs from the embedded hash, the page redirects to `?v=<hash>` to force a fresh fetch
+- The `?v=` param acts as a cache-busting URL change — each version gets a unique URL
 
 ## Monitoring (Access Log via GitHub Issues)
 

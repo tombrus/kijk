@@ -4,6 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{TITLE}}</title>
+  <script>
+    (async function() {
+      const BUILD_HASH = "{{BUILD_HASH}}";
+      try {
+        const resp       = await fetch("version.txt?_=" + Date.now());
+        const serverHash = (await resp.text()).trim();
+        if (serverHash !== BUILD_HASH) {
+          const params = new URLSearchParams(location.search);
+          if (params.get("v") !== serverHash) {
+            params.set("v", serverHash);
+            location.replace(location.pathname + "?" + params.toString());
+          }
+        }
+      } catch {
+        // Offline or fetch error — continue with current version
+      }
+    })();
+  </script>
   <style>
     * {
       margin: 0;
