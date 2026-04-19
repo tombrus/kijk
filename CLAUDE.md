@@ -33,9 +33,9 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 
 - `build.mjs` computes a SHA-256 hash (first 8 hex chars) of the HTML before injecting the hash
 - Hash is embedded in the wrapper as `BUILD_HASH` constant and written to `dist/version.txt`
-- On page load, the wrapper fetches `version.txt?_=<timestamp>` (always fresh due to cache-busting query param)
-- If the server hash differs from the embedded hash, the page redirects to `?v=<hash>` to force a fresh fetch
-- The `?v=` param acts as a cache-busting URL change — each version gets a unique URL
+- On page load, the wrapper fetches `version.txt` with `cache: "no-store"` (always hits server)
+- If the server hash differs from the embedded hash, the wrapper refetches `location.pathname` with `cache: "reload"` to bypass the HTTP cache (and the CDN cache via the resulting `Cache-Control: no-cache` request header), then replaces the current document via `document.open`/`write`/`close`
+- This avoids relying on query-string cache keying (which CDNs may ignore) and avoids needing a manual hard refresh
 
 ## Monitoring (Access Log via GitHub Issues)
 
