@@ -111,6 +111,16 @@
       margin-top: 0.75rem;
       font-size: 0.85rem;
     }
+    .build-info {
+      position: fixed;
+      bottom: 6px;
+      left: 8px;
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.35);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      z-index: 999999;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -124,6 +134,7 @@
     </form>
     <div id="error" class="error"></div>
   </div>
+  <div class="build-info">{{BUILD_DATE}} {{BUILD_HASH}}</div>
 
   <script>
     const PAYLOAD           = "{{PAYLOAD}}";
@@ -131,6 +142,7 @@
     const STORAGE_KEY       = "kijk-key";
     const MONITOR_KEY       = "{{MONITOR_KEY}}";
     const MONITOR_DATA      = "{{MONITOR_DATA}}";
+    const BUILD_INFO        = "{{BUILD_DATE}} {{BUILD_HASH}}";
 
     function parsePayload() {
       const raw        = Uint8Array.from(atob(PAYLOAD), (c) => c.charCodeAt(0));
@@ -279,6 +291,20 @@
         location.reload();
       });
       document.body.appendChild(btn);
+
+      const info = document.createElement("div");
+      info.textContent = BUILD_INFO;
+      info.style.cssText = [
+        "position:fixed",
+        "bottom:6px",
+        "left:8px",
+        "font-size:0.7rem",
+        "color:rgba(0,0,0,0.35)",
+        "font-family:ui-monospace,SFMono-Regular,Menlo,monospace",
+        "z-index:999999",
+        "pointer-events:none",
+      ].join(";");
+      document.body.appendChild(info);
     }
 
     async function decryptWithPassword(password) {

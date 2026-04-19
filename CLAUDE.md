@@ -36,6 +36,7 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 - On page load, the wrapper fetches `version.txt` with `cache: "no-store"` (always hits server)
 - If the server hash differs from the embedded hash, the wrapper refetches `location.pathname` with `cache: "reload"` to bypass the HTTP cache (and the CDN cache via the resulting `Cache-Control: no-cache` request header), then replaces the current document via `document.open`/`write`/`close`
 - This avoids relying on query-string cache keying (which CDNs may ignore) and avoids needing a manual hard refresh
+- `build.mjs` also injects `{{BUILD_DATE}}` (YYYY-MM-DD). Date + hash are displayed as small print in the lower-left corner on both the password screen and the decrypted page
 
 ## Monitoring (Access Log via GitHub Issues)
 

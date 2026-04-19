@@ -35,8 +35,11 @@ html     = html.replace("{{MONITOR_KEY}}", monitorKey);
 html     = html.replace("{{MONITOR_DATA}}", monitorData);
 html     = html.replaceAll("{{TITLE}}", title);
 
+const buildDate = new Date().toISOString().slice(0, 10);
+html            = html.replaceAll("{{BUILD_DATE}}", buildDate);
+
 const buildHash = createHash("sha256").update(html).digest("hex").slice(0, 8);
-html            = html.replace("{{BUILD_HASH}}", buildHash);
+html            = html.replaceAll("{{BUILD_HASH}}", buildHash);
 
 await mkdir("dist", { recursive: true });
 await writeFile(outputPath, html, "utf8");
