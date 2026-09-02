@@ -6,9 +6,6 @@
     <option name="numChars" value="15" />
     <option name="caseSensitive" value="false" />
   </component>
-  <component name="ComposerSettings">
-    <execution />
-  </component>
   <component name="IntelliTail">
     <property name="buffer-wrap" value="false" />
     <property name="buffer-size" value="50" />
