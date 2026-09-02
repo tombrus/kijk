@@ -7,6 +7,7 @@ Host private HTML on public GitHub Pages. The repo stores only an encrypted payl
 - `secrets/page.html` — secret HTML (gitignored)
 - `secrets/sync.sh` — copies info.json and page.html from source repo (gitignored)
 - `secrets/info.json` — master-key, pat, pat-key, monitor-issue, title (gitignored)
+  - WARNING: this file is a synced copy. `prepare.sh` runs `sync.sh` first, which overwrites it from the source repo. Never edit `secrets/info.json` directly — edits are silently lost on the next prepare/sync. Always edit info.json in the source repo (path in `secrets/sync.sh`).
 - `encrypted/payload.enc` — base64-encoded encrypted payload (committed)
 - `encrypted/monitor.enc` — encrypted monitor config (committed)
 - `encrypted/monitor.key` — pat-key copy for build + monitor (committed)
@@ -67,6 +68,13 @@ Optional feature: logs access events (unlock, session restore, failed attempts) 
    ```
 3. Run `./prepare.sh` (auto-generates pat-key, finds/creates issue, saves them back to info.json, encrypts everything)
 4. Commit `encrypted/` and push
+
+### Renewing the PAT (when it expires — API returns 401)
+
+1. github.com → Settings → Developer settings → Fine-grained tokens → regenerate (or create new: this repo only, Issues Read & Write)
+2. Put the token in the `"pat"` field of info.json **in the source repo** (not `secrets/info.json` — sync overwrites that, see the warning under Project Structure) and save the file to disk
+3. Run `./prepare.sh` — it re-encrypts `monitor.enc` and verifies by running `npm run monitor`
+4. `git add encrypted/ && git commit && git push`
 
 ### Reading the Log
 
